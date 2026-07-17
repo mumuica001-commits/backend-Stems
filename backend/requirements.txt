@@ -11,16 +11,16 @@ redis==5.0.8
 rq==1.16.2
 
 # --- Separação de fonte (IA) ---
-demucs==4.0.1
-torch==2.4.1
-torchaudio==2.4.1
-onnxruntime==1.19.2       # troque por onnxruntime-gpu==1.19.2 em produção com CUDA
+demucs
+torch
+torchaudio
+onnxruntime     # troque por onnxruntime-gpu==1.19.2 em produção com CUDA
 
 # --- Análise musical / DSP ---
 librosa==0.10.2.post1
 soundfile==0.12.1
 pyloudnorm==0.1.1
-numpy==1.26.4
+numpy
 scipy==1.14.1
 
 # --- Testes ---
