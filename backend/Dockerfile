@@ -1,23 +1,23 @@
-FROM python:3.11-slim AS base
+# Imagem base do Python
+FROM python:3.10-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libsndfile1 \
+# Instalar dependências de sistema se sua aplicação precisar processar áudio (Spleeter, Demucs, FFmpeg, etc.)
+RUN apt-get update && apt-get install -y \
     ffmpeg \
-    build-essential \
+    libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /srv
+WORKDIR /app
 
+# Copiar e instalar dependências do Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
-COPY workers ./workers
+# Copiar todo o resto do projeto para dentro do container
+COPY . .
 
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/srv
-
+# Expõe a porta dinâmica usada pelo Railway
 EXPOSE 8000
 
-# imagem única — o comando decide se sobe API ou worker (ver docker-compose.yml)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# O Railway injeta a porta em $PORT, garantindo que o Uvicorn a escute
+CMD ["sh", "-x", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
