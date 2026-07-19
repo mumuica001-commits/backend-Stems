@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os  # Adicionado para ler o ambiente diretamente
 import redis
 from rq import Queue
 
@@ -12,7 +13,19 @@ class JobQueue:
 
     def __init__(self, redis_client: redis.Redis | None = None):
         settings = get_settings()
-        self._redis = redis_client or redis.Redis.from_url(settings.redis_url)
+        
+        # Se o cliente não for passado, buscamos a URL com fallbacks seguros para o Railway
+        if not redis_client:
+            # Tenta pegar da variável minúscula, se não tiver tenta a maiúscula, se não tiver usa o config
+            redis_url = (
+                os.getenv("redis_url") or 
+                os.getenv("REDIS_URL") or 
+                settings.redis_url
+            )
+            self._redis = redis.Redis.from_url(redis_url)
+        else:
+            self._redis = redis_client
+
         self._queue = Queue(settings.queue_name, connection=self._redis, default_timeout="30m")
 
     def enqueue_processing(self, job_id: str):
