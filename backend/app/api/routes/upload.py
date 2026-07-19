@@ -26,7 +26,7 @@ async def upload_audio(
     try:
         import io
 
-        job = use_case.execute(
+        job = await use_case.execute(
             filename=file.filename,
             file_stream=io.BytesIO(contents),
             content_length_bytes=len(contents),
