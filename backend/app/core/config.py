@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     allowed_extensions: tuple[str, ...] = (".mp3", ".wav", ".flac", ".aiff", ".aac", ".ogg", ".m4a")
 
     # Redis / fila
-    redis_url: str = "redis://localhost:6379/0"
+    # Altere de string fixa para ler o ambiente do Railway:
+    redis_url: str = "redis://localhost:6379/0"  # Se o Pydantic já ler automaticamente, mantenha, mas garanta o passo 2.
     queue_name: str = "stemsai:separation"
 
     # Separação
