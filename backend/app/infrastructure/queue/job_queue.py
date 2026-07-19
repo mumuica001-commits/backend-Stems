@@ -14,15 +14,28 @@ class JobQueue:
     def __init__(self, redis_client: redis.Redis | None = None):
         settings = get_settings()
         
-        # Se o cliente não for passado, buscamos a URL com fallbacks seguros para o Railway
         if not redis_client:
-            # Tenta pegar da variável minúscula, se não tiver tenta a maiúscula, se não tiver usa o config
-            redis_url = (
+            # 1. Busca a URL de qualquer uma das variáveis possíveis
+            raw_url = (
                 os.getenv("redis_url") or 
                 os.getenv("REDIS_URL") or 
                 settings.redis_url
             )
-            self._redis = redis.Redis.from_url(redis_url)
+            
+            # 2. Força o uso do protocolo privado interno (sem SSL/TLS estrito que quebra a rede do Railway)
+            # Se a URL começar com rediss:// (com dois 's'), mudamos para redis:// (com um 's')
+            if raw_url.startswith("rediss://"):
+                redis_url = raw_url.replace("rediss://", "redis://", 1)
+            else:
+                redis_url = raw_url
+
+            # 3. Cria a conexão desativando checagens estritas que causam loops de erro
+            self._redis = redis.Redis.from_url(
+                redis_url, 
+                ssl_cert_reqs=None,      # Ignora validação estrita de certificado se houver desvio de porta
+                socket_timeout=5.0,      # Evita travar o servidor se o Redis sumir
+                retry_on_timeout=False   # Mata a requisição em vez de inundar o log com 500 reconexões por segundo
+            )
         else:
             self._redis = redis_client
 
