@@ -40,11 +40,29 @@ class JobQueue:
             self._redis = redis_client
 
         self._queue = Queue(settings.queue_name, connection=self._redis, default_timeout="30m")
-
-    def enqueue_processing(self, job_id: str):
+def enqueue_processing(self, job_id: str):
         from app.infrastructure.queue.tasks import process_separation_job
+        import logging
 
-        return self._queue.enqueue(process_separation_job, job_id, job_id=job_id)
+        # 1. Isso vai printar no seu log do Railway qual URL o Python está tentando conectar
+        print(f"[DEBUG REDIS] Tentando conectar no Redis...")
+        
+        try:
+            # Tenta verificar a conexão antes de mandar o Job
+            self._redis.ping()
+            print("[DEBUG REDIS] Conexão com Redis realizada com SUCESSO!")
+            
+            # Executa o envio para a fila
+            return self._queue.enqueue(process_separation_job, job_id, job_id=job_id)
+            
+        except Exception as e:
+            print(f"[DEBUG REDIS ERRO CRÍTICO] Falha ao interagir com o Redis: {str(e)}")
+            # Devolve um erro amigável para o FastAPI não quebrar com erro 500 genérico
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Erro de comunicação com a fila de processamento (Redis). Causa: {str(e)}"
+            )
 
     def get_queue_position(self, job_id: str) -> int | None:
         job_ids = self._queue.job_ids
