@@ -16,7 +16,7 @@ class UploadAudioUseCase:
         self._queue = job_queue or JobQueue()
         self._settings = get_settings()
 
-    def execute(
+    async def execute(
         self,
         filename: str,
         file_stream,
@@ -36,7 +36,7 @@ class UploadAudioUseCase:
             shutil.copyfileobj(file_stream, dest_file)
 
         job.source_path = dest_path
-        self._jobs.save(job)
+        await self._jobs.save(job)
         self._queue.enqueue_processing(job.id)
 
         return job
