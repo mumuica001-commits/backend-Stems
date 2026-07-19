@@ -14,40 +14,33 @@ class JobQueue:
     def __init__(self, redis_client: redis.Redis | None = None):
         settings = get_settings()
         
-        if not redis_client:
+    if not redis_client:
             raw_url = (
                 os.getenv("redis_url") or 
                 os.getenv("REDIS_URL") or 
                 settings.redis_url
             )
             
-            # ATENÇÃO: Se a URL começar com rediss:// (produção no Railway), 
-            # mantemos o rediss:// original e deixamos a biblioteca gerenciar o SSL nativamente.
-            if raw_url.startswith("rediss://"):
+            # Garantimos que a variável sempre exista, usando a raw_url como padrão
+            redis_url = raw_url
+            
+            if redis_url.startswith("rediss://"):
                 self._redis = redis.Redis.from_url(
-                    raw_url,
-                    ssl_cert_reqs="none", # Na versão 5.x, se passado, precisa ser a string "none" minúscula, ou simplesmente omitido
+                    redis_url,
+                    ssl_cert_reqs="none",
                     socket_timeout=5.0,
                     retry_on_timeout=False
                 )
             else:
-                # Conexão padrão local (sem SSL)
                 self._redis = redis.Redis.from_url(
-                    raw_url,
+                    redis_url,
                     socket_timeout=5.0,
                     retry_on_timeout=False
                 )
-
-            self._redis = redis.Redis.from_url(
-                redis_url, 
-                ssl_cert_reqs=None,
-                socket_timeout=5.0,
-                retry_on_timeout=False
-            )
-        else:
+    else:
             self._redis = redis_client
 
-        self._queue = Queue(settings.queue_name, connection=self._redis, default_timeout="30m")
+    self._queue = Queue(settings.queue_name, connection=self._redis, default_timeout="30m")
 
     def enqueue_processing(self, job_id: str):
         from app.infrastructure.queue.tasks import process_separation_job
