@@ -13,17 +13,16 @@ class JobQueue:
 
     def __init__(self, redis_client: redis.Redis | None = None):
         settings = get_settings()
-        
-    if not redis_client:
+
+        if not redis_client:
             raw_url = (
                 os.getenv("redis_url") or 
                 os.getenv("REDIS_URL") or 
                 settings.redis_url
             )
-            
-            # Garantimos que a variável sempre exista, usando a raw_url como padrão
+
             redis_url = raw_url
-            
+
             if redis_url.startswith("rediss://"):
                 self._redis = redis.Redis.from_url(
                     redis_url,
@@ -37,22 +36,22 @@ class JobQueue:
                     socket_timeout=5.0,
                     retry_on_timeout=False
                 )
-    else:
+        else:
             self._redis = redis_client
 
-    self._queue = Queue(settings.queue_name, connection=self._redis, default_timeout="30m")
+        self._queue = Queue(settings.queue_name, connection=self._redis, default_timeout="30m")
 
     def enqueue_processing(self, job_id: str):
         from app.infrastructure.queue.tasks import process_separation_job
         from fastapi import HTTPException
 
-        print(f"[DEBUG REDIS] Tentando conectar no Redis...")
-        
+        print("[DEBUG REDIS] Tentando conectar no Redis...")
+
         try:
             self._redis.ping()
             print("[DEBUG REDIS] Conexão com Redis realizada com SUCESSO!")
             return self._queue.enqueue(process_separation_job, job_id, job_id=job_id)
-            
+
         except Exception as e:
             print(f"[DEBUG REDIS ERRO CRÍTICO] Falha ao interagir com o Redis: {str(e)}")
             raise HTTPException(
@@ -64,5 +63,4 @@ class JobQueue:
         job_ids = self._queue.job_ids
         return job_ids.index(job_id) if job_id in job_ids else None
     
-    #Forçando commit
-    
+    #nao entendo o git que eu mudo o codigo e ele fala que eu nao mudei pqp
