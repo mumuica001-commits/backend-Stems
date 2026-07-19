@@ -21,10 +21,22 @@ class JobQueue:
                 settings.redis_url
             )
             
+            # ATENÇÃO: Se a URL começar com rediss:// (produção no Railway), 
+            # mantemos o rediss:// original e deixamos a biblioteca gerenciar o SSL nativamente.
             if raw_url.startswith("rediss://"):
-                redis_url = raw_url.replace("rediss://", "redis://", 1)
+                self._redis = redis.Redis.from_url(
+                    raw_url,
+                    ssl_cert_reqs="none", # Na versão 5.x, se passado, precisa ser a string "none" minúscula, ou simplesmente omitido
+                    socket_timeout=5.0,
+                    retry_on_timeout=False
+                )
             else:
-                redis_url = raw_url
+                # Conexão padrão local (sem SSL)
+                self._redis = redis.Redis.from_url(
+                    raw_url,
+                    socket_timeout=5.0,
+                    retry_on_timeout=False
+                )
 
             self._redis = redis.Redis.from_url(
                 redis_url, 
