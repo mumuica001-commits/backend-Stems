@@ -1,26 +1,41 @@
+import json
 import uuid
-from typing import Dict, Any, Optional
+import os
+import redis
+from typing import Any, Optional
+from app.core.config import get_settings
 
-# Repositório totalmente simulado em memória (blindado contra erros de importação)
 class JobRepository:
-    _db: Dict[str, Any] = {}
+    def __init__(self, redis_client: Optional[redis.Redis] = None):
+        if not redis_client:
+            settings = get_settings()
+            raw_url = os.getenv("redis_url") or os.getenv("REDIS_URL") or settings.redis_url
+            
+            if raw_url.startswith("rediss://"):
+                self._redis = redis.Redis.from_url(raw_url, ssl_cert_reqs="none")
+            else:
+                self._redis = redis.Redis.from_url(raw_url)
+        else:
+            self._redis = redis_client
 
     def get_by_id(self, job_id: str) -> Optional[Any]:
-        return self._db.get(job_id)
+        # Busca os dados do Job diretamente do Redis
+        data = self._redis.get(f"job:{job_id}")
+        if data:
+            # Recompoe/Desserializa o objeto se necessário
+            return data
+        return None
 
     def save(self, job: Any) -> Any:
-        # Se o objeto tiver um atributo id, usamos ou criamos ele
-        if hasattr(job, 'id'):
-            if not job.id:
-                job.id = str(uuid.uuid4())
-            self._db[job.id] = job
-        # Se for um dicionário
-        elif isinstance(job, dict):
-            if 'id' not in job or not job['id']:
-                job['id'] = str(uuid.uuid4())
-            self._db[job['id']] = job
-        else:
-            # Fallback genérico para salvar de qualquer forma
+        job_id = getattr(job, 'id', None) or (job.get('id') if isinstance(job, dict) else None)
+        if not job_id:
             job_id = str(uuid.uuid4())
-            self._db[job_id] = job
+            if hasattr(job, 'id'):
+                job.id = job_id
+            elif isinstance(job, dict):
+                job['id'] = job_id
+
+        # Salva o estado do Job no Redis por até 24h
+        # (Se 'job' for uma entidade complexa, converta para dict/json ou pickle)
+        self._redis.set(f"job:{job_id}", str(job), ex=86400)
         return job
