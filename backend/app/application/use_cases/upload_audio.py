@@ -4,7 +4,7 @@ import uuid
 from fastapi import UploadFile
 
 from app.core.config import get_settings
-from app.domain.entities import SeparationJob, SeparationEngine
+from app.domain.entities import SeparationJob
 from app.infrastructure.queue.job_queue import JobQueue
 from app.infrastructure.storage.job_repository import JobRepository
 
@@ -33,11 +33,8 @@ class UploadAudioUseCase:
         with open(source_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Converte a string do engine para o Enum
-        try:
-            selected_engine = SeparationEngine(engine.lower())
-        except ValueError:
-            selected_engine = SeparationEngine.DEMUCS
+        # Tenta utilizar o Enum do Job se disponível ou atribui a string do engine
+        selected_engine = engine.lower() if isinstance(engine, str) else engine
 
         # Cria a entidade do Job
         job = SeparationJob(
