@@ -58,4 +58,4 @@ class JobRepository:
         }
 
         self._redis.set(f"job:{job_id}", json.dumps(job_data), ex=86400)
-        return job
+        return job  

@@ -1,51 +1,56 @@
-from __future__ import annotations
-
 import os
 import shutil
+import uuid
+from fastapi import UploadFile
 
 from app.core.config import get_settings
-from app.domain.entities import SeparationEngineName, SeparationJob
-from app.domain.exceptions import AudioTooLargeError, UnsupportedAudioFormatError
+from app.domain.entities import SeparationJob, SeparationEngine
 from app.infrastructure.queue.job_queue import JobQueue
 from app.infrastructure.storage.job_repository import JobRepository
 
 
 class UploadAudioUseCase:
-    def __init__(self, job_repository: JobRepository | None = None, job_queue: JobQueue | None = None):
+    def __init__(
+        self,
+        job_repository: JobRepository | None = None,
+        job_queue: JobQueue | None = None,
+    ):
         self._jobs = job_repository or JobRepository()
         self._queue = job_queue or JobQueue()
         self._settings = get_settings()
 
-    async def execute(
-        self,
-        filename: str,
-        file_stream,
-        content_length_bytes: int,
-        engine: SeparationEngineName,
-    ) -> SeparationJob:
-        self._validate(filename, content_length_bytes)
+    async def execute(self, file: UploadFile, engine: str = "demucs") -> SeparationJob:
+        job_id = str(uuid.uuid4())
+        
+        # Garante a criação da pasta temporária no container
+        upload_dir = os.path.join(self._settings.storage_root, self._settings.uploads_dir)
+        os.makedirs(upload_dir, exist_ok=True)
 
-        job = SeparationJob(original_filename=filename, engine=engine)
+        file_extension = os.path.splitext(file.filename or "")[1] or ".mp3"
+        source_path = os.path.join(upload_dir, f"{job_id}{file_extension}")
 
-        uploads_dir = os.path.join(self._settings.storage_root, self._settings.uploads_dir)
-        os.makedirs(uploads_dir, exist_ok=True)
+        # Salva o arquivo enviado no disco do container
+        with open(source_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-        extension = os.path.splitext(filename)[1].lower()
-        dest_path = os.path.join(uploads_dir, f"{job.id}{extension}")
-        with open(dest_path, "wb") as dest_file:
-            shutil.copyfileobj(file_stream, dest_file)
+        # Converte a string do engine para o Enum
+        try:
+            selected_engine = SeparationEngine(engine.lower())
+        except ValueError:
+            selected_engine = SeparationEngine.DEMUCS
 
-        job.source_path = dest_path
-        await self._jobs.save(job)
+        # Cria a entidade do Job
+        job = SeparationJob(
+            id=job_id,
+            filename=file.filename or "audio.mp3",
+            source_path=source_path,
+            engine=selected_engine,
+        )
+
+        # Salva o job no repositório (Redis)
+        self._jobs.save(job)
+
+        # Envia para a fila do RQ
         self._queue.enqueue_processing(job.id)
 
         return job
-
-    def _validate(self, filename: str, content_length_bytes: int) -> None:
-        extension = os.path.splitext(filename)[1].lower()
-        if extension not in self._settings.allowed_extensions:
-            raise UnsupportedAudioFormatError(extension)
-
-        size_mb = content_length_bytes / (1024 * 1024)
-        if size_mb > self._settings.max_upload_size_mb:
-            raise AudioTooLargeError(size_mb, self._settings.max_upload_size_mb)
