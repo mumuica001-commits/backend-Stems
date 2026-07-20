@@ -5,10 +5,10 @@ from typing import Dict, Any, Optional
 class JobRepository:
     _db: Dict[str, Any] = {}
 
-    async def get_by_id(self, job_id: str) -> Optional[Any]:
+    def get_by_id(self, job_id: str) -> Optional[Any]:
         return self._db.get(job_id)
 
-    async def save(self, job: Any) -> Any:
+    def save(self, job: Any) -> Any:
         # Se o objeto tiver um atributo id, usamos ou criamos ele
         if hasattr(job, 'id'):
             if not job.id:

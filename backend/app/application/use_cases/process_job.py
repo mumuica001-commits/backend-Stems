@@ -36,7 +36,8 @@ class ProcessJobUseCase:
         self._settings = get_settings()
 
     def execute(self, job_id: str) -> None:
-        job = self._jobs.get(job_id)
+        # Mude de self._jobs.get(job_id) para:
+        job = self._jobs.get_by_id(job_id)
 
         try:
             self._run_analysis(job)
@@ -45,8 +46,9 @@ class ProcessJobUseCase:
             self._save_and_publish(job, "Processamento concluído.")
         except Exception as exc:
             logger.exception("Job %s falhou", job_id)
-            job.mark_failed(str(exc))
-            self._save_and_publish(job, f"Erro: {exc}")
+            if job:
+                job.mark_failed(str(exc))
+                self._save_and_publish(job, f"Erro: {exc}")
             raise
 
     def _run_analysis(self, job: SeparationJob) -> None:
