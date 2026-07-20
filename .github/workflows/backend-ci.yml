@@ -1,0 +1,52 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libsndfile1 ffmpeg
+
+      - name: Install Python deps (sem torch/demucs — CI só valida análise + lógica + engine dev_dsp_mock)
+        run: |
+          pip install librosa soundfile pyloudnorm numpy scipy redis rq fastapi \
+                      pydantic pydantic-settings pytest pytest-asyncio httpx ruff
+
+      - name: Lint
+        run: ruff check app tests
+
+      - name: Run tests (unitários + integração ponta a ponta com Redis real)
+        run: PYTHONPATH=. pytest tests/ -v
