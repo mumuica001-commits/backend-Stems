@@ -59,4 +59,3 @@ class UploadAudioUseCase:
         self._queue.enqueue_processing(job.id)
 
         return job
-    
